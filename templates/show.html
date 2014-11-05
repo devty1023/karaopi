@@ -1,0 +1,22 @@
+{% extends "base.html" %}
+{% block header %}
+    <link rel="stylesheet" type="text/css" href="{{ url_for('static', filename='css/index.css') }}">
+    <script type="text/javascript" src="{{ url_for('static', filename='js/bluek.js') }}"></script>
+{% endblock %}
+
+{% block body %}
+    <div class="jumbotron vertical-center">
+    <div class="container">
+
+      <div class="col-md-8 col-md-offset-2">
+        <audio id="audio" src="/src/{{sid}}.skym" autoplay>
+        </audio>
+        <div class="bluek"
+             data-audio="audio"
+             data-src="/data/{{sid}}">
+        </div> 
+      </div>
+
+    </div>
+    </div>
+{% endblock %}

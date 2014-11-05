@@ -1,0 +1,63 @@
+{% extends "base.html" %}
+{% block body %}
+    <div class="container">
+      <div class='col-md-6 col-md-offset-3' id='main-content'>
+          <form class="form-horizontal" name="search" action="/" method="post">
+            <div class="input-group">
+              <div class="input-group-btn" data-toggle="buttons">
+                <label class="btn btn-primary active">
+                  <input type="radio" name="qtype" value="2" id="option1" autocomplete="off" checked>제목
+                </label>
+                <label class="btn btn-primary">
+                  <input type="radio" name="qtype" value="7" id="option2" autocomplete="off">가수
+                </label>
+              </div>
+              <input name="query" type="text" class="form-control" placeholder="Search">
+              <div class="input-group-btn">
+                <input type="submit" class="btn btn-default">
+              </div>
+            </div>
+          </form>
+        {% if not songs|length %} 
+        <div class="alert alert-danger" role="alert">
+            <b>Nothing found!</b>
+        </div>
+        {% else %}
+        <table class="table table-hover">
+        <tr>
+          <th>SID</th>
+          <th>제목</th>
+          <th>가수</th>
+        </tr>
+        {% for song in songs %}
+        <tr>
+            <td>
+              <a href="/show/{{ song.sid }}">
+                {{ song.sid }}
+              </a>
+            </td>
+
+            <td>
+              <a href="/show/{{ song.sid }}">
+                {{ song.title }}
+              </a>
+            </td>
+
+            <td>
+              <a href="/show/{{ song.sid }}">
+                {{ song.singer }}
+              </a>
+            </td>
+        </tr>
+        {% endfor %}
+        </table>
+        <form action="/" method="post">
+            <input type="hidden" name="query" value="{{ query }}">
+            <input type="hidden" name="qtype" value="{{ qtype }}">
+            <input type="hidden" name="page" value="{{ next_page }}">
+            <input type="submit" class="btn btn-default" value="next">
+        </form>
+        {% endif %}
+      </div>
+    </div>
+{% endblock %}

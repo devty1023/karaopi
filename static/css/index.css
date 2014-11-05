@@ -1,0 +1,11 @@
+html {
+    overflow: hidden;
+}
+
+body {
+    padding-top: 0px;
+}
+
+#main-content {
+    padding: 5px;
+}

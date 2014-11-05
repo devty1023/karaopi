@@ -1,0 +1,32 @@
+body {
+    padding-top: 90px;
+}
+
+.vertical-center {
+  min-height: 100%;  /* Fallback for browsers do NOT support vh unit */
+  min-height: 100vh; /* These two lines are counted as one :-)       */
+
+  display: flex;
+  align-items: center;
+}
+
+.jumbotron {
+    background-color: transparent;
+}
+
+.bluek {
+    text-align: center;
+}
+
+.bluek.current {
+    color: #0c84e4;
+}
+
+.bluek.following {
+    color: #aaaaaa;
+}
+
+.input-group-btn {
+    padding-right: 10px;
+    padding-left: 10px;
+}

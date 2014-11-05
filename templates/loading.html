@@ -1,0 +1,23 @@
+{% extends "base.html" %}
+{% block body %}
+    <div class="container">
+      <div class='col-md-6 col-md-offset-3'>
+        <img style="margin:0 auto;" class="img-responsive img-center" src="{{ url_for('static', filename='img/loading.gif') }}">
+        <h3 id="status" class="text-center">downloading... </h3>
+      </div>
+    </div>
+  </body>
+
+  <script>
+    $(document).ready(function() {
+        $.getJSON("/download/{{ sid }}", function(data) {
+            if(data.status) {
+                window.location.href = "/show/{{ sid }}";
+            }
+            else {
+                $("#id").html("download failed :(")
+            }
+        });
+    });
+  </script>
+{% endblock %}

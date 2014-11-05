@@ -1,4 +1,41 @@
+import json
 import struct
+import sys
+
+class LyricLine(object):
+    def __init__(self, line):
+        self.words = []
+        self.line = line
+
+    @property
+    def start(self):
+        """ return start time of this line. We dynamically calculate the value
+        """
+        return sorted(self.words, key=lambda word : word.start)[0].start
+
+    @property
+    def end(self):
+        """ return end time of this line. We dynamically calculate the value
+        """
+        return sorted(self.words, key=lambda word : word.end)[-1].end
+
+    def __dict__(self):
+        return {
+                'start' : self.start,
+                'end'   : self.end,
+                'line'  : self.line
+            }
+
+class LyricWord(object):
+    def __init__(self, **kwargs):
+        self.start = kwargs['start'] 
+        self.end = kwargs['end']
+        self.index = kwargs['index']
+        self.length = kwargs['length']
+        self.rel_line = kwargs['rel_line']
+        self.abs_line = kwargs['abs_line']
+        self.newline = True if kwargs['newline'] else False
+        self.word = kwargs['word']
 
 class Skym(object):
     @classmethod
@@ -48,26 +85,27 @@ class Skym(object):
         # section 3: song lyric
         # content: contains song lyrics
         # length: variable
-
+        #
         ## lyrics laid out as "page by page"
         ## Each 'page' can have any number of bytes
         ## Each 'page' is separated with X 00 bytes
         ## where the number of 00 bytes is not really knwon
         ## When 'STAG' x(53 54 41 47) is read, we know we have 
         ## reached the end of lyric section
+
         LYRIC_EOS = [b'\x53', b'\x54', b'\x41', b'\x47']
-        word = ['']*4
-        bytes_read = 0
-        cur_page = []
-        in_padding = False
+        word = ['']*4       # holds currently read word (4 bytes)
+        bytes_read = 0      # holds number of bytes read
+        cur_page = []       # holds bytes of the current "page"
+        in_padding = False  # tells wheter we are reading padded values
 
-        self.lyric = []
+        self.b_lyric = []   # hold pages of lyric as binary
+        self.lyric = []     # holds pages of lyrics decoded to cp949
 
-        ## we skip the first 4 byte (garbage)
+        ## we skip the first 4 byte (ltag garbage)
         f.read(4)
 
-        ## we read until we read a 32byte word 
-        ## equivalent to LYRIC_EOS 
+        ## we read until we read STAG
         while word != LYRIC_EOS:
             byte = f.read(1)
             word[bytes_read % 4] = byte
@@ -80,6 +118,7 @@ class Skym(object):
                     in_padding = True
                     ## append decoded lyric to the lyric
                     lyric = b''.join(cur_page)
+                    self.b_lyric.append(lyric)
                     self.lyric.append(lyric.decode('cp949'))
                     cur_page = []
             else:
@@ -87,8 +126,69 @@ class Skym(object):
                 cur_page.append(byte)
             
 
+        # section 4: song lyric info
+        # content: maps lyric to song (length of each word)
+        # length: variable
+        #
+        ## lyric info is laid out in units of 23 bytes 
+        ## per "word" in the song's lyric
+        ##
+        ## format:
+        ## AA AA AA AA BB BB BB BB CC DD EE 00 00 00 FF 00 00 00 0G 0F 00 00 00
+        ## AA = word starttime in milisec
+        ## BB = word endtime in milisec
+        ## CC = byte _index_ of the current lyric page
+        ## DD = number of bytes (from CC) to be highlighted
+        ## EE = relative line number (current verse)
+        ## FF = absolute line number (entire song)
+        ## G = end of section
+        ## F = newline?
+
+        ## for simplicity, we will only parse out 
+        ## the length of each "page"
+        LYRIC_FMT = "IIBBB3xB3xBB3x" 
+        i_fields = ('start',
+                    'end',
+                    'index',
+                    'length',
+                    'rel_line',
+                    'abs_line',
+                    'EOF',
+                    'newline')
+        EOF_BYTE = 7
+
         import codecs
-        for i in range(100):
+        self.lyric_info = [None] * len(self.lyric)
+
+        while True:
+            b_info = f.read(23)
+            i_vals = struct.unpack(LYRIC_FMT, b_info)
+            info = {k : v for 
+                        k,v in zip(i_fields, i_vals)}
+
+            ## extract "word" associated with this set
+            index = info['index']
+            length = info['length']
+            word_str = self.b_lyric[info['abs_line']][index:index+length].decode('cp949')
+            word = LyricWord(word=word_str, **info)
+            line = self.lyric_info[info['abs_line']]  
+
+            if not line:
+                line = LyricLine(self.lyric[info['abs_line']])
+
+            line.words.append(word) 
+            self.lyric_info[info['abs_line']] = line
+
+            ## EOF Byte is seen AND all lyric has been filled
+            if (info['EOF'] == EOF_BYTE) and not (None in self.lyric_info):
+                break
+
+    def toJson(self):
+        return json.dumps(list(map(lambda x : x.__dict__(),self.lyric_info)))
+
+def _print_sec4():
+        import codecs
+        for i in range(1000):
             bs = f.read(23)
             to_print = []
             for i in range(len(bs)):
@@ -96,16 +196,26 @@ class Skym(object):
                 encoded_b = codecs.encode(byte, 'hex')
                 if byte != b'\x00':
                     to_print.append(encoded_b)
-
-
             if len(to_print) == 7:
                 to_print.insert(4, b'00')
             if len(to_print) < 7:
                 to_print.append(b'00')
-            #print("{1}\t{2}\t:{0}".format(str(to_print), int(to_print[3],16) - int(to_print[1],16)))
+
+            sec = (int(to_print[3],16) - int(to_print[1],16))
+            if sec < 0:
+                sec = 256 - (int(to_print[1],16) - int(to_print[3],16)) 
+            print("{1}\t:{0}".format(str(to_print), sec))
                 
+def _print_lyric(lyric):
+    lyric = ["{}\t{}".format(y,x) for x, y in zip(lyric, range(1,len(lyric)+1))]
+    print("\n".join(lyric))
 
 if __name__ == "__main__":
-    sk = Skym.open("./sample/76754.skym")
+    import json
+    song = "./sample/{}.skym".format(sys.argv[1])
+    sk = Skym.open(song)
+    print(sk.toJson())
     #print(sk.info)
-    print("\n".join(sk.lyric))
+
+    #_print_lyric(sk.lyric)
+    #print("\n".join(lyric))
